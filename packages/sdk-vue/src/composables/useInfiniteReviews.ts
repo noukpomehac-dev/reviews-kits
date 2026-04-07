@@ -1,7 +1,7 @@
-import { ref, onMounted, onUnmounted, watch } from 'vue';
-import { reviewsApi } from '../api/reviews';
-import { mapReviews } from '../api/mappers/review.mapper';
+import { ref, computed, onMounted, onUnmounted, watch, inject } from 'vue';
+import { reviewsApi, mapReviews } from '@reviewskits/core';
 import { ReviewApiParams, Review, ReviewApiResponseMeta } from '../types';
+import { InjectionKey } from '../core/config';
 
 export interface InfiniteData {
   pages: {
@@ -11,6 +11,7 @@ export interface InfiniteData {
 }
 
 export const useInfiniteReviews = (params: Omit<ReviewApiParams, 'page'>) => {
+  const config = inject(InjectionKey, undefined);
   const data = ref<InfiniteData>({ pages: [] });
   const isLoading = ref(true);
   const isFetchingNextPage = ref(false);
@@ -35,7 +36,7 @@ export const useInfiniteReviews = (params: Omit<ReviewApiParams, 'page'>) => {
       const response = await reviewsApi.getReviews({
         ...params,
         page,
-      }, { signal });
+      }, { signal }, config);
 
       if (signal?.aborted) return;
 
@@ -82,14 +83,12 @@ export const useInfiniteReviews = (params: Omit<ReviewApiParams, 'page'>) => {
     if (controller) controller.abort();
   });
 
-  // Re-fetch everything if params change
-  watch(
-    () => params,
-    () => {
-      fetchPage(1, true);
-    },
-    { deep: true }
-  );
+  // Serialize params to a string so Vue compares values, not object identity.
+  // Avoids deep: true which traverses the whole object tree every tick.
+  const serializedParams = computed(() => JSON.stringify(params));
+  watch(serializedParams, () => {
+    fetchPage(1, true);
+  });
 
   return {
     data,

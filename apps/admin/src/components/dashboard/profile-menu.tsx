@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   User,
@@ -12,57 +12,31 @@ import {
   Check
 } from 'lucide-react'
 import { authClient } from '../../lib/auth-client'
+import { useApiKeys, useRotateApiKeys } from '../../hooks/useApiKeys'
 
 interface ProfileMenuProps {
   isOpen: boolean
   onClose: () => void
 }
 
-interface ApiKeys {
-  publicKey: string
-  secretKey: string
-}
-
 export const ProfileMenu = ({ isOpen, onClose }: ProfileMenuProps) => {
   const { data: session } = authClient.useSession()
-  const [apiKeys, setApiKeys] = useState<ApiKeys | null>(null)
   const [showSecret, setShowSecret] = useState(false)
-  const [loadingKeys, setLoadingKeys] = useState(false)
   const [showApiKeys, setShowApiKeys] = useState(false)
   const [copiedKey, setCopiedKey] = useState<'public' | 'secret' | null>(null)
 
-  useEffect(() => {
-    if (isOpen) {
-      fetchApiKeys()
-    }
-  }, [isOpen])
-
-  const fetchApiKeys = async () => {
-    setLoadingKeys(true)
-    try {
-      const res = await fetch('/api/v1/api-keys')
-      if (res.ok) setApiKeys(await res.json())
-    } catch (error) {
-      console.error("Failed to fetch keys", error)
-    } finally {
-      setLoadingKeys(false)
-    }
-  }
-
-  const handleRotateKeys = async () => {
-    if (!confirm("Regenerate your keys? Old ones will become invalid.")) return
-    try {
-      const res = await fetch('/api/v1/api-keys/rotate', { method: 'POST' })
-      if (res.ok) setApiKeys(await res.json())
-    } catch (error) {
-      console.error("Failed to rotate keys", error)
-    }
-  }
+  const { data: apiKeys, isLoading: loadingKeys } = useApiKeys(isOpen)
+  const rotateKeys = useRotateApiKeys()
 
   const copyToClipboard = (text: string, type: 'public' | 'secret') => {
     navigator.clipboard.writeText(text)
     setCopiedKey(type)
     setTimeout(() => setCopiedKey(null), 2000)
+  }
+
+  const handleRotateKeys = () => {
+    if (!confirm("Regenerate your keys? Old ones will become invalid.")) return
+    rotateKeys.mutate()
   }
 
   const handleLogout = async () => {
@@ -87,115 +61,114 @@ export const ProfileMenu = ({ isOpen, onClose }: ProfileMenuProps) => {
            </div>
         </div>
 
-        <div className="py-2">
-          <div className="h-px bg-[var(--v3-border)] mx-4 my-2 opacity-50" />
+      <div className="py-2">
+        <div className="h-px bg-(--v3-border) mx-4 my-2 opacity-50" />
 
-          {/* Menu Items */}
-          <div className="px-2 space-y-0.5">
-            <Link 
-              to="/profile" 
-              onClick={onClose}
-              className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-[13px] font-medium text-[var(--v3-text)] hover:bg-[var(--v3-border)] transition-all group"
+        <div className="px-2 space-y-0.5">
+          <Link
+            to="/profile"
+            onClick={onClose}
+            className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-[13px] font-medium text-(--v3-text) hover:bg-(--v3-border) transition-all group"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-lg bg-(--v3-bg3) border border-(--v3-border) flex items-center justify-center text-(--v3-muted2) group-hover:text-(--v3-teal) transition-colors">
+                <User size={16} />
+              </div>
+              My Profile
+            </div>
+            <ChevronRight size={14} className="text-(--v3-muted)" />
+          </Link>
+
+          <Link
+            to="/settings"
+            onClick={onClose}
+            className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-[13px] font-medium text-(--v3-text) hover:bg-(--v3-border) transition-all group"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-lg bg-(--v3-bg3) border border-(--v3-border) flex items-center justify-center text-(--v3-muted2) group-hover:text-(--v3-teal) transition-colors">
+                <Settings size={16} />
+              </div>
+              Settings
+            </div>
+            <ChevronRight size={14} className="text-(--v3-muted)" />
+          </Link>
+
+          {/* API Keys Item */}
+          <div className="space-y-1">
+            <button
+              onClick={() => setShowApiKeys(!showApiKeys)}
+              className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-[13px] font-medium transition-all group ${showApiKeys ? 'bg-(--v3-border) text-(--v3-teal)' : 'text-(--v3-text) hover:bg-(--v3-border)'}`}
             >
               <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-[var(--v3-bg3)] border border-[var(--v3-border)] flex items-center justify-center text-[var(--v3-muted2)] group-hover:text-[var(--v3-teal)] transition-colors">
-                  <User size={16} />
+                <div className={`w-8 h-8 rounded-lg bg-(--v3-bg3) border border-(--v3-border) flex items-center justify-center transition-colors ${showApiKeys ? 'text-(--v3-teal)' : 'text-(--v3-muted2) group-hover:text-(--v3-teal)'}`}>
+                  <Key size={16} />
                 </div>
-                My Profile
+                API Keys
               </div>
-              <ChevronRight size={14} className="text-[var(--v3-muted)]" />
-            </Link>
-
-            <Link
-              to="/settings"
-              onClick={onClose}
-              className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-[13px] font-medium text-[var(--v3-text)] hover:bg-[var(--v3-border)] transition-all group"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-[var(--v3-bg3)] border border-[var(--v3-border)] flex items-center justify-center text-[var(--v3-muted2)] group-hover:text-[var(--v3-teal)] transition-colors">
-                  <Settings size={16} />
-                </div>
-                Settings
+              <div className="flex items-center gap-2">
+                {loadingKeys && <RefreshCw size={10} className="animate-spin text-(--v3-muted2)" />}
+                <ChevronRight size={14} className={`text-(--v3-muted) transition-transform duration-200 ${showApiKeys ? 'rotate-90' : ''}`} />
               </div>
-              <ChevronRight size={14} className="text-[var(--v3-muted)]" />
-            </Link>
+            </button>
 
-{/* API Keys Item */}
-            <div className="space-y-1">
-              <button
-                onClick={() => setShowApiKeys(!showApiKeys)}
-                className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-[13px] font-medium transition-all group ${showApiKeys ? 'bg-[var(--v3-border)] text-[var(--v3-teal)]' : 'text-[var(--v3-text)] hover:bg-[var(--v3-border)]'}`}
-              >
-                <div className="flex items-center gap-3">
-                  <div className={`w-8 h-8 rounded-lg bg-[var(--v3-bg3)] border border-[var(--v3-border)] flex items-center justify-center transition-colors ${showApiKeys ? 'text-[var(--v3-teal)]' : 'text-[var(--v3-muted2)] group-hover:text-[var(--v3-teal)]'}`}>
-                    <Key size={16} />
-                  </div>
-                  API Keys
-                </div>
-                <div className="flex items-center gap-2">
-                  {loadingKeys && <RefreshCw size={10} className="animate-spin text-[var(--v3-muted2)]" />}
-                  <ChevronRight size={14} className={`text-[var(--v3-muted)] transition-transform duration-200 ${showApiKeys ? 'rotate-90' : ''}`} />
-                </div>
-              </button>
-
-              {showApiKeys && (
-                <div className="px-3 pb-2 pt-1 space-y-2 animate-in slide-in-from-top-2 duration-200">
-                  <div className="bg-[var(--v3-bg)] border border-[var(--v3-border)] rounded-lg p-2.5 flex items-center justify-between group/key">
-                    <div className="min-w-0 pr-2">
-                        <div className="text-[8px] font-bold text-[var(--v3-muted2)] uppercase mb-0.5">Public Key</div>
-                        <div className="text-[10px] font-mono text-[var(--v3-text)] truncate opacity-60 group-hover/key:opacity-100 transition-opacity">
-                          {apiKeys?.publicKey || 'rk_pk_live_...'}
-                        </div>
+            {showApiKeys && (
+              <div className="px-3 pb-2 pt-1 space-y-2 animate-in slide-in-from-top-2 duration-200">
+                <div className="bg-(--v3-bg) border border-(--v3-border) rounded-lg p-2.5 flex items-center justify-between group/key">
+                  <div className="min-w-0 pr-2">
+                    <div className="text-[8px] font-bold text-(--v3-muted2) uppercase mb-0.5">Public Key</div>
+                    <div className="text-[10px] font-mono text-(--v3-text) truncate opacity-60 group-hover/key:opacity-100 transition-opacity">
+                      {apiKeys?.publicKey || 'rk_pk_live_...'}
                     </div>
+                  </div>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); if (apiKeys) copyToClipboard(apiKeys.publicKey, 'public') }}
+                    className={`p-1.5 rounded-md transition-all ${copiedKey === 'public' ? 'text-emerald-500 bg-emerald-500/10' : 'hover:bg-(--v3-border) text-(--v3-muted2) hover:text-(--v3-teal)'}`}
+                  >
+                    {copiedKey === 'public' ? <Check size={12} /> : <Copy size={12} />}
+                  </button>
+                </div>
+
+                <div className="bg-(--v3-bg) border border-(--v3-border) rounded-lg p-2.5 flex items-center justify-between group/key">
+                  <div className="min-w-0 pr-2 cursor-pointer" onClick={(e) => { e.stopPropagation(); setShowSecret(!showSecret) }}>
+                    <div className="text-[8px] font-bold text-rose-400 uppercase mb-0.5">Secret Key</div>
+                    <div className="text-[10px] font-mono text-(--v3-text) truncate opacity-60 group-hover/key:opacity-100 transition-opacity">
+                      {showSecret ? (apiKeys?.secretKey || 'rk_sk_...') : '••••••••••••••••'}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1">
                     <button
-                      onClick={(e) => { e.stopPropagation(); if (apiKeys) copyToClipboard(apiKeys.publicKey, 'public'); }}
-                      className={`p-1.5 rounded-md transition-all ${copiedKey === 'public' ? 'text-emerald-500 bg-emerald-500/10' : 'hover:bg-[var(--v3-border)] text-[var(--v3-muted2)] hover:text-[var(--v3-teal)]'}`}
+                      onClick={(e) => { e.stopPropagation(); if (apiKeys) copyToClipboard(apiKeys.secretKey, 'secret') }}
+                      className={`p-1.5 rounded-md transition-all ${copiedKey === 'secret' ? 'text-emerald-500 bg-emerald-500/10' : 'hover:bg-(--v3-border) text-(--v3-muted2) hover:text-rose-400'}`}
                     >
-                      {copiedKey === 'public' ? <Check size={12} /> : <Copy size={12} />}
+                      {copiedKey === 'secret' ? <Check size={12} /> : <Copy size={12} />}
+                    </button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); handleRotateKeys() }}
+                      className="p-1.5 hover:bg-(--v3-border) rounded-md text-(--v3-muted2) hover:text-(--v3-teal) transition-all"
+                    >
+                      <RefreshCw size={12} />
                     </button>
                   </div>
-
-                  <div className="bg-[var(--v3-bg)] border border-[var(--v3-border)] rounded-lg p-2.5 flex items-center justify-between group/key">
-                    <div className="min-w-0 pr-2 cursor-pointer" onClick={(e) => { e.stopPropagation(); setShowSecret(!showSecret); }}>
-                        <div className="text-[8px] font-bold text-rose-400 uppercase mb-0.5">Secret Key</div>
-                        <div className="text-[10px] font-mono text-[var(--v3-text)] truncate opacity-60 group-hover/key:opacity-100 transition-opacity">
-                          {showSecret ? (apiKeys?.secretKey || 'rk_sk_...') : '••••••••••••••••'}
-                        </div>
-                    </div>
-                    <div className="flex items-center gap-1">
-                        <button
-                          onClick={(e) => { e.stopPropagation(); if (apiKeys) copyToClipboard(apiKeys.secretKey, 'secret'); }}
-                          className={`p-1.5 rounded-md transition-all ${copiedKey === 'secret' ? 'text-emerald-500 bg-emerald-500/10' : 'hover:bg-[var(--v3-border)] text-[var(--v3-muted2)] hover:text-rose-400'}`}
-                        >
-                          {copiedKey === 'secret' ? <Check size={12} /> : <Copy size={12} />}
-                        </button>
-                        <button
-                          onClick={(e) => { e.stopPropagation(); handleRotateKeys(); }}
-                          className="p-1.5 hover:bg-[var(--v3-border)] rounded-md text-[var(--v3-muted2)] hover:text-[var(--v3-teal)] transition-all"
-                        >
-                          <RefreshCw size={12} />
-                        </button>
-                    </div>
-                  </div>
                 </div>
-              )}
-            </div>
-          </div>
-
-          <div className="h-px bg-[var(--v3-border)] mx-4 my-2" />
-
-          <div className="px-2">
-            <button 
-              onClick={handleLogout}
-              className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-[13px] font-medium text-rose-400 hover:bg-rose-500/10 transition-all border border-transparent hover:border-rose-500/20"
-            >
-              <div className="w-8 h-8 rounded-lg bg-rose-500/5 flex items-center justify-center">
-                <LogOut size={16} />
               </div>
-              Logout
-            </button>
+            )}
           </div>
         </div>
+
+        <div className="h-px bg-(--v3-border) mx-4 my-2" />
+
+        <div className="px-2">
+          <button
+            onClick={handleLogout}
+            className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-[13px] font-medium text-rose-400 hover:bg-rose-500/10 transition-all border border-transparent hover:border-rose-500/20"
+          >
+            <div className="w-8 h-8 rounded-lg bg-rose-500/5 flex items-center justify-center">
+              <LogOut size={16} />
+            </div>
+            Logout
+          </button>
+        </div>
+      </div>
 
         {/* Footer info */}
         <div className="p-4 bg-[var(--v3-bg3)]/60 flex items-center justify-between">

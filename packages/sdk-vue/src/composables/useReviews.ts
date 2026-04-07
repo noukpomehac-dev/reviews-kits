@@ -1,62 +1,43 @@
-import { ref, watch, onMounted, onUnmounted } from 'vue';
-import { reviewsApi } from '../api/reviews';
-import { mapReviews } from '../api/mappers/review.mapper';
+import { ref, watchEffect, inject } from 'vue';
+import { reviewsApi, mapReviews } from '@reviewskits/core';
 import { ReviewApiParams, Review } from '../types';
+import { InjectionKey } from '../core/config';
 
 export const useReviews = (params: ReviewApiParams) => {
+  const config = inject(InjectionKey, undefined);
   const data = ref<{ reviews: Review[] } | null>(null);
   const isLoading = ref(true);
   const error = ref<any>(null);
-  let controller: AbortController | null = null;
+  // Incrementing this ref forces watchEffect to re-run on manual refetch.
+  const refreshTick = ref(0);
 
-  const fetchReviews = async (signal?: AbortSignal) => {
+  watchEffect((onCleanup) => {
+    refreshTick.value; // Force dependency tracking
+    const controller = new AbortController();
+    onCleanup(() => controller.abort());
+
     isLoading.value = true;
     error.value = null;
 
-    try {
-      const response = await reviewsApi.getReviews(params, { signal });
-      if (signal?.aborted) return;
-
-      data.value = {
-        reviews: mapReviews(response.data),
-      };
-    } catch (err: any) {
-      if (err.name === 'AbortError') return;
-      error.value = err;
-    } finally {
-      if (!signal?.aborted) {
-        isLoading.value = false;
-      }
-    }
-  };
-
-  const executeFetch = () => {
-    if (controller) controller.abort();
-    controller = new AbortController();
-    fetchReviews(controller.signal);
-  };
-
-  onMounted(() => {
-    executeFetch();
+    reviewsApi
+      .getReviews({ ...params }, { signal: controller.signal }, config)
+      .then((response) => {
+        if (controller.signal.aborted) return;
+        data.value = { reviews: mapReviews(response.data) };
+      })
+      .catch((err: any) => {
+        if (err.name === 'AbortError') return;
+        error.value = err;
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) isLoading.value = false;
+      });
   });
-
-  onUnmounted(() => {
-    if (controller) controller.abort();
-  });
-
-  // Re-fetch when params change
-  watch(
-    () => params,
-    () => {
-      executeFetch();
-    },
-    { deep: true }
-  );
 
   return {
     data,
     isLoading,
     error,
-    refetch: executeFetch,
+    refetch: () => { refreshTick.value++ },
   };
 };
